@@ -1,0 +1,68 @@
+# MAGTRON, Evolution API, Postgres e Redis.
+# scripts/wsl-up.sh gera o arquivo .env com as senhas e sobe tudo.
+services:
+  magtron:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      APP_SECRET: ${APP_SECRET:?defina APP_SECRET}
+      DATABASE_URL: postgresql://magtron:${POSTGRES_PASSWORD}@postgres:5432/magtron
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3333}
+      INTERNAL_URL: http://magtron:3333
+      EVOLUTION_URL: http://evolution-api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Cadastro fechado depois do primeiro usuário (equipe entra por convite). Só abra com ALLOW_REGISTRATION=true se quiser.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      # A porta só escuta em 127.0.0.1 (proxy local: Tailscale/Caddy), então o IP do cliente pode vir do cabeçalho do proxy.
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+    ports: ["127.0.0.1:3333:3333"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: magtron
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: magtron
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magtron"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  evolution-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  evolution-api:
+    # Versão fixa (v2.3.7): "latest" poderia trocar o código sem você perceber. Para atualizar, troque o digest de propósito.
+    image: evoapicloud/evolution-api@sha256:966625532d9076a2381e973a271307d107e6f070450de3abeeea8bd18be07252
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      evolution-redis: { condition: service_started }
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?defina EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://magtron:${POSTGRES_PASSWORD}@postgres:5432/magtron?schema=evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/1
+      CACHE_LOCAL_ENABLED: "false"
+      CONFIG_SESSION_PHONE_CLIENT: MAGTRON
+    volumes: [evolution:/evolution/instances]
+    ports: ["127.0.0.1:8080:8080"]
+
+volumes:
+  pgdata:
+  evolution:

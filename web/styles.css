@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #11161a;
+  --color-ink-2: #1b2329;
+  --color-ink-3: #2c363e;
+  --color-paper: #f4f3ee;
+  --color-line: #dedcd3;
+  --color-muted: #6b7076;
+  --color-volt: #c8f031;
+  --color-volt-dark: #5d7406;
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); }
+.react-flow__handle { width: 11px; height: 11px; background: var(--color-ink); border: 2px solid white; }
+.react-flow__attribution { display: none; }
